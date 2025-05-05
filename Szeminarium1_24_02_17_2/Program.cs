@@ -382,7 +382,7 @@ namespace Szeminarium1_24_02_17_2
                 AppContext.BaseDirectory,                   // bin\Debug\net8.0
                 "..", "..", "..",                                       // ← vissza a projekt gyokereig
                 "Resources",
-                "sandal.obj"));
+                "cat.obj"));
             // alapszin a szandalnak
             float[] defaultColor = { 1f, 0.6f, 0.2f, 1f };
 

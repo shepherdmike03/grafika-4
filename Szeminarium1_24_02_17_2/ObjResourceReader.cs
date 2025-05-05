@@ -8,8 +8,8 @@ namespace Szeminarium1_24_02_17_2
     {
         public static unsafe GlObject LoadObjWithColor
         (
-            GL      Gl,
-            string  objFileName,
+            GL Gl,
+            string objFileName,
             float[] defaultFaceColor
         )
         {
@@ -22,7 +22,7 @@ namespace Szeminarium1_24_02_17_2
             // cpu oldali lista OPENGL hez
             List<float> glV = new();
             List<float> glC = new();
-            List<uint>  glI = new();
+            List<uint> glI = new();
 
             CreateGlArraysFromObjArrays(defaultFaceColor, objV, objN, objF, glV, glC, glI);
 
@@ -33,9 +33,7 @@ namespace Szeminarium1_24_02_17_2
             return CreateOpenGlObject(Gl, vao, glV, glC, glI);
         }
 
-        
-        
-        
+
         private static unsafe GlObject CreateOpenGlObject(GL Gl, uint vao, List<float> glVertices, List<float> glColors,
             List<uint> glIndices)
         {
@@ -72,62 +70,68 @@ namespace Szeminarium1_24_02_17_2
 
         private static void CreateGlArraysFromObjArrays
 (
-    float[]                           faceColor,
-    List<float[]>                     objVertices,
-    List<float[]>                     objNormals,
-    List<(int v,int n)[]>             objFaces,
-    List<float>                       glVertices,
-    List<float>                       glColors,
-    List<uint>                        glIndices
+    float[]                      faceColor,
+    List<float[]>                objV,
+    List<float[]>                objN,
+    List<(int v,int n)[]>        objFaces,
+    List<float>                  glV,
+    List<float>                  glC,
+    List<uint>                   glI
 )
 {
-    Dictionary<string, int> uniqueIndex = new();
+    Dictionary<string,int> uniq = new();
 
     foreach (var face in objFaces)
     {
-        // van e mindharom csucson normal index
-        bool faceHasNormals =
-            face[0].n > 0 && face[1].n > 0 && face[2].n > 0 &&
-            objNormals.Count >= Math.Max(Math.Max(face[0].n, face[1].n), face[2].n);
+        int vc = face.Length;                         // face‑en beluli csucspontok szsma
 
-        // ha nincs szamoljunk lapnormat
-        Vector3D<float> fallbackNormal = default;
-        if (!faceHasNormals)
+        //ellenorizzuk, hogy minden csucshoz van e normal‑index
+        bool hasN = true;
+        for (int k = 0; k < vc && hasN; ++k)
+            hasN &= face[k].n > 0 && face[k].n <= objN.Count;
+
+        //ha nincs szamolunk egy lapnormalt az első 3 csucsbol
+        Vector3D<float> flatN = default;
+        if (!hasN)
         {
-            Vector3D<float> a = new(objVertices[face[0].v - 1][0],
-                                    objVertices[face[0].v - 1][1],
-                                    objVertices[face[0].v - 1][2]);
-            Vector3D<float> b = new(objVertices[face[1].v - 1][0],
-                                    objVertices[face[1].v - 1][1],
-                                    objVertices[face[1].v - 1][2]);
-            Vector3D<float> c = new(objVertices[face[2].v - 1][0],
-                                    objVertices[face[2].v - 1][1],
-                                    objVertices[face[2].v - 1][2]);
-            fallbackNormal = Vector3D.Normalize(Vector3D.Cross(b - a, c - a));
+            var pA = objV[face[0].v - 1];
+            var pB = objV[face[1].v - 1];
+            var pC = objV[face[2].v - 1];
+
+            Vector3D<float> a = new(pA[0], pA[1], pA[2]);
+            Vector3D<float> b = new(pB[0], pB[1], pB[2]);
+            Vector3D<float> c = new(pC[0], pC[1], pC[2]);
+
+            flatN = Vector3D.Normalize(Vector3D.Cross(b - a, c - a));
         }
 
-        // a 3 csucs feldolgozasa
-        for (int i = 0; i < 3; ++i)
+        
+        for (int i = 1; i < vc - 1; ++i)
         {
-            float[] pos = objVertices[face[i].v - 1];
+            int[] tri = { 0, i, i + 1 };
 
-            float[] normArr;
-            if (faceHasNormals)
-                normArr = objNormals[face[i].n - 1];
-            else
-                normArr = new[] { fallbackNormal.X, fallbackNormal.Y, fallbackNormal.Z };
-
-            // kulcs az egyediseghez
-            string key = $"{pos[0]} {pos[1]} {pos[2]} {normArr[0]} {normArr[1]} {normArr[2]}";
-            if (!uniqueIndex.ContainsKey(key))
+            foreach (int idx in tri)
             {
-                glVertices.AddRange(pos);                       // v.x v.y v.z
-                glVertices.AddRange(normArr);                   // n.x n.y n.z
-                glColors  .AddRange(faceColor);
-                uniqueIndex[key] = uniqueIndex.Count;
-            }
+                float[] posArr = objV[face[idx].v - 1];
+                float[] nrmArr = hasN
+                                 ? objN[face[idx].n - 1]
+                                 : new[] { flatN.X, flatN.Y, flatN.Z };
 
-            glIndices.Add((uint)uniqueIndex[key]);
+                string key = $"{posArr[0]} {posArr[1]} {posArr[2]} " +
+                             $"{nrmArr[0]} {nrmArr[1]} {nrmArr[2]}";
+
+                if (!uniq.TryGetValue(key, out int glIndex))
+                {
+                    glIndex = uniq.Count;
+                    uniq[key] = glIndex;
+
+                    glV.AddRange(posArr);                                       // v.x v.y v.z
+                    glV.AddRange(nrmArr);                                       // n.x n.y n.z
+                    glC.AddRange(faceColor);
+                }
+
+                glI.Add((uint)glIndex);
+            }
         }
     }
 }
@@ -147,20 +151,20 @@ namespace Szeminarium1_24_02_17_2
             using StreamReader sr = new StreamReader(fileName);
             while (!sr.EndOfStream)
             {
-                var line = sr.ReadLine()?.Trim();
-                if (string.IsNullOrEmpty(line) || line.StartsWith('#')) continue;
+                string? line = sr.ReadLine()?.Trim();
+                if (string.IsNullOrEmpty(line) || line[0] == '#') continue;
 
-                var firstSpace = line.IndexOf(' ');
-                var tag = firstSpace == -1 ? line : line[..firstSpace];
-                var data = firstSpace == -1
+                int firstSpace = line.IndexOf(' ');
+                string tag = firstSpace == -1 ? line : line[..firstSpace];
+                string[] data = firstSpace == -1
                     ? Array.Empty<string>()
-                    : line[(firstSpace + 1)..].Split(' ',
-                        StringSplitOptions.RemoveEmptyEntries);
+                    : line[(firstSpace + 1)..]
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
                 switch (tag)
                 {
-                    case "v": // vertex
-                        objVertices.Add(new float[]
+                    case "v":                                                   // csucspont
+                        objVertices.Add(new[]
                         {
                             float.Parse(data[0], CultureInfo.InvariantCulture),
                             float.Parse(data[1], CultureInfo.InvariantCulture),
@@ -168,8 +172,8 @@ namespace Szeminarium1_24_02_17_2
                         });
                         break;
 
-                    case "vn":                                      // normal
-                        objNormals.Add(new float[]
+                    case "vn":                                                  // normal
+                        objNormals.Add(new[]
                         {
                             float.Parse(data[0], CultureInfo.InvariantCulture),
                             float.Parse(data[1], CultureInfo.InvariantCulture),
@@ -177,27 +181,21 @@ namespace Szeminarium1_24_02_17_2
                         });
                         break;
 
-                    case "f":                                       // face (haromszognek feltetelezzuk)
-                        var face = new (int v, int n)[3];
-                        for (int i = 0; i < 3; ++i)
+                    case "f":                                                   // oldal hossz
+                        var verts = new (int v, int n)[data.Length];
+                        for (int i = 0; i < data.Length; ++i)
                         {
-                            var parts = data[i].Split('/');
-                            face[i].v = int.Parse(parts[0]);
+                            string[] p = data[i].Split('/');
+                            verts[i].v = int.Parse(p[0]);                       // mindig van
 
-                            //   v//n  => parts.Length==3 && parts[1]==""               --> normal a parts[2]-ben
-                            //   v/n   => parts.Length==2                               --> normal a parts[1]-ben
-                            //   v/t/n => parts.Length==3 && parts[2] != ""             --> normal a parts[2]-ben
-                            
-                            
-                            
-                            face[i].n = -1;
-                            if (parts.Length == 2 && !string.IsNullOrEmpty(parts[1]))
-                                face[i].n = int.Parse(parts[1]);
-                            else if (parts.Length == 3 && !string.IsNullOrEmpty(parts[2]))
-                                face[i].n = int.Parse(parts[2]);
+                            verts[i].n = -1;                                    // alap||||   nincs normal‑idx
+                            if (p.Length == 2 && p[1] != "")
+                                verts[i].n = int.Parse(p[1]);                   // „v/n”
+                            else if (p.Length == 3 && p[2] != "")
+                                verts[i].n = int.Parse(p[2]);                   // „v//n” vagy „v/t/n”
                         }
 
-                        objFaces.Add(face);
+                        objFaces.Add(verts);
                         break;
                 }
             }
