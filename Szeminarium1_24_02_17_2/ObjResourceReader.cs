@@ -6,26 +6,38 @@ namespace Szeminarium1_24_02_17_2
 {
     internal class ObjResourceReader
     {
-        public static unsafe GlObject CreateTeapotWithColor(GL Gl, float[] faceColor)
+        public static unsafe GlObject LoadObjWithColor
+        (
+            GL      Gl,
+            string  objFileName,
+            float[] defaultFaceColor
+        )
         {
+            // obj beolvas
+            ReadObjFile(objFileName,
+                out var objV,
+                out var objN,
+                out var objF);
+
+            // cpu oldali lista OPENGL hez
+            List<float> glV = new();
+            List<float> glC = new();
+            List<uint>  glI = new();
+
+            CreateGlArraysFromObjArrays(defaultFaceColor, objV, objN, objF, glV, glC, glI);
+
+            // tenyleges OpenGl objektum
             uint vao = Gl.GenVertexArray();
             Gl.BindVertexArray(vao);
 
-            List<float[]> objVertices;
-            List<int[]> objFaces;
-
-            ReadObjDataForTeapot(out objVertices, out objFaces);
-
-            List<float> glVertices = new List<float>();
-            List<float> glColors = new List<float>();
-            List<uint> glIndices = new List<uint>();
-
-            CreateGlArraysFromObjArrays(faceColor, objVertices, objFaces, glVertices, glColors, glIndices);
-
-            return CreateOpenGlObject(Gl, vao, glVertices, glColors, glIndices);
+            return CreateOpenGlObject(Gl, vao, glV, glC, glI);
         }
 
-        private static unsafe GlObject CreateOpenGlObject(GL Gl, uint vao, List<float> glVertices, List<float> glColors, List<uint> glIndices)
+        
+        
+        
+        private static unsafe GlObject CreateOpenGlObject(GL Gl, uint vao, List<float> glVertices, List<float> glColors,
+            List<uint> glIndices)
         {
             uint offsetPos = 0;
             uint offsetNormal = offsetPos + (3 * sizeof(float));
@@ -48,7 +60,8 @@ namespace Szeminarium1_24_02_17_2
 
             uint indices = Gl.GenBuffer();
             Gl.BindBuffer(GLEnum.ElementArrayBuffer, indices);
-            Gl.BufferData(GLEnum.ElementArrayBuffer, (ReadOnlySpan<uint>)glIndices.ToArray().AsSpan(), GLEnum.StaticDraw);
+            Gl.BufferData(GLEnum.ElementArrayBuffer, (ReadOnlySpan<uint>)glIndices.ToArray().AsSpan(),
+                GLEnum.StaticDraw);
 
             // release array buffer
             Gl.BindBuffer(GLEnum.ArrayBuffer, 0);
@@ -57,81 +70,135 @@ namespace Szeminarium1_24_02_17_2
             return new GlObject(vao, vertices, colors, indices, indexArrayLength, Gl);
         }
 
-        private static unsafe void CreateGlArraysFromObjArrays(float[] faceColor, List<float[]> objVertices, List<int[]> objFaces, List<float> glVertices, List<float> glColors, List<uint> glIndices)
+        private static void CreateGlArraysFromObjArrays
+(
+    float[]                           faceColor,
+    List<float[]>                     objVertices,
+    List<float[]>                     objNormals,
+    List<(int v,int n)[]>             objFaces,
+    List<float>                       glVertices,
+    List<float>                       glColors,
+    List<uint>                        glIndices
+)
+{
+    Dictionary<string, int> uniqueIndex = new();
+
+    foreach (var face in objFaces)
+    {
+        // van e mindharom csucson normal index
+        bool faceHasNormals =
+            face[0].n > 0 && face[1].n > 0 && face[2].n > 0 &&
+            objNormals.Count >= Math.Max(Math.Max(face[0].n, face[1].n), face[2].n);
+
+        // ha nincs szamoljunk lapnormat
+        Vector3D<float> fallbackNormal = default;
+        if (!faceHasNormals)
         {
-            Dictionary<string, int> glVertexIndices = new Dictionary<string, int>();
-
-            foreach (var objFace in objFaces)
-            {
-                var aObjVertex = objVertices[objFace[0] - 1];
-                var a = new Vector3D<float>(aObjVertex[0], aObjVertex[1], aObjVertex[2]);
-                var bObjVertex = objVertices[objFace[1] - 1];
-                var b = new Vector3D<float>(bObjVertex[0], bObjVertex[1], bObjVertex[2]);
-                var cObjVertex = objVertices[objFace[2] - 1];
-                var c = new Vector3D<float>(cObjVertex[0], cObjVertex[1], cObjVertex[2]);
-
-                var normal = Vector3D.Normalize(Vector3D.Cross(b - a, c - a));
-
-                // process 3 vertices
-                for (int i = 0; i < objFace.Length; ++i)
-                {
-                    var objVertex = objVertices[objFace[i] - 1];
-
-                    // create gl description of vertex
-                    List<float> glVertex = new List<float>();
-                    glVertex.AddRange(objVertex);
-                    glVertex.Add(normal.X);
-                    glVertex.Add(normal.Y);
-                    glVertex.Add(normal.Z);
-                    // add textrure, color
-
-                    // check if vertex exists
-                    var glVertexStringKey = string.Join(" ", glVertex);
-                    if (!glVertexIndices.ContainsKey(glVertexStringKey))
-                    {
-                        glVertices.AddRange(glVertex);
-                        glColors.AddRange(faceColor);
-                        glVertexIndices.Add(glVertexStringKey, glVertexIndices.Count);
-                    }
-
-                    // add vertex to triangle indices
-                    glIndices.Add((uint)glVertexIndices[glVertexStringKey]);
-                }
-            }
+            Vector3D<float> a = new(objVertices[face[0].v - 1][0],
+                                    objVertices[face[0].v - 1][1],
+                                    objVertices[face[0].v - 1][2]);
+            Vector3D<float> b = new(objVertices[face[1].v - 1][0],
+                                    objVertices[face[1].v - 1][1],
+                                    objVertices[face[1].v - 1][2]);
+            Vector3D<float> c = new(objVertices[face[2].v - 1][0],
+                                    objVertices[face[2].v - 1][1],
+                                    objVertices[face[2].v - 1][2]);
+            fallbackNormal = Vector3D.Normalize(Vector3D.Cross(b - a, c - a));
         }
 
-        private static unsafe void ReadObjDataForTeapot(out List<float[]> objVertices, out List<int[]> objFaces)
+        // a 3 csucs feldolgozasa
+        for (int i = 0; i < 3; ++i)
         {
-            objVertices = new List<float[]>();
-            objFaces = new List<int[]>();
-            using (Stream objStream = typeof(ObjResourceReader).Assembly.GetManifestResourceStream("Szeminarium1_24_02_17_2.Resources.teapot.obj"))
-            using (StreamReader objReader = new StreamReader(objStream))
+            float[] pos = objVertices[face[i].v - 1];
+
+            float[] normArr;
+            if (faceHasNormals)
+                normArr = objNormals[face[i].n - 1];
+            else
+                normArr = new[] { fallbackNormal.X, fallbackNormal.Y, fallbackNormal.Z };
+
+            // kulcs az egyediseghez
+            string key = $"{pos[0]} {pos[1]} {pos[2]} {normArr[0]} {normArr[1]} {normArr[2]}";
+            if (!uniqueIndex.ContainsKey(key))
             {
-                while (!objReader.EndOfStream)
+                glVertices.AddRange(pos);                       // v.x v.y v.z
+                glVertices.AddRange(normArr);                   // n.x n.y n.z
+                glColors  .AddRange(faceColor);
+                uniqueIndex[key] = uniqueIndex.Count;
+            }
+
+            glIndices.Add((uint)uniqueIndex[key]);
+        }
+    }
+}
+
+        private static void ReadObjFile
+        (
+            string fileName,
+            out List<float[]> objVertices,
+            out List<float[]> objNormals,
+            out List<(int v, int n)[]> objFaces
+        )
+        {
+            objVertices = new();
+            objNormals = new();
+            objFaces = new();
+
+            using StreamReader sr = new StreamReader(fileName);
+            while (!sr.EndOfStream)
+            {
+                var line = sr.ReadLine()?.Trim();
+                if (string.IsNullOrEmpty(line) || line.StartsWith('#')) continue;
+
+                var firstSpace = line.IndexOf(' ');
+                var tag = firstSpace == -1 ? line : line[..firstSpace];
+                var data = firstSpace == -1
+                    ? Array.Empty<string>()
+                    : line[(firstSpace + 1)..].Split(' ',
+                        StringSplitOptions.RemoveEmptyEntries);
+
+                switch (tag)
                 {
-                    var line = objReader.ReadLine();
+                    case "v": // vertex
+                        objVertices.Add(new float[]
+                        {
+                            float.Parse(data[0], CultureInfo.InvariantCulture),
+                            float.Parse(data[1], CultureInfo.InvariantCulture),
+                            float.Parse(data[2], CultureInfo.InvariantCulture)
+                        });
+                        break;
 
-                    if (String.IsNullOrEmpty(line) || line.Trim().StartsWith("#"))
-                        continue;
+                    case "vn":                                      // normal
+                        objNormals.Add(new float[]
+                        {
+                            float.Parse(data[0], CultureInfo.InvariantCulture),
+                            float.Parse(data[1], CultureInfo.InvariantCulture),
+                            float.Parse(data[2], CultureInfo.InvariantCulture)
+                        });
+                        break;
 
-                    var lineClassifier = line.Substring(0, line.IndexOf(' '));
-                    var lineData = line.Substring(lineClassifier.Length).Trim().Split(' ');
+                    case "f":                                       // face (haromszognek feltetelezzuk)
+                        var face = new (int v, int n)[3];
+                        for (int i = 0; i < 3; ++i)
+                        {
+                            var parts = data[i].Split('/');
+                            face[i].v = int.Parse(parts[0]);
 
-                    switch (lineClassifier)
-                    {
-                        case "v":
-                            float[] vertex = new float[3];
-                            for (int i = 0; i < vertex.Length; ++i)
-                                vertex[i] = float.Parse(lineData[i], CultureInfo.InvariantCulture);
-                            objVertices.Add(vertex);
-                            break;
-                        case "f":
-                            int[] face = new int[3];
-                            for (int i = 0; i < face.Length; ++i)
-                                face[i] = int.Parse(lineData[i]);
-                            objFaces.Add(face);
-                            break;
-                    }
+                            //   v//n  => parts.Length==3 && parts[1]==""               --> normal a parts[2]-ben
+                            //   v/n   => parts.Length==2                               --> normal a parts[1]-ben
+                            //   v/t/n => parts.Length==3 && parts[2] != ""             --> normal a parts[2]-ben
+                            
+                            
+                            
+                            face[i].n = -1;
+                            if (parts.Length == 2 && !string.IsNullOrEmpty(parts[1]))
+                                face[i].n = int.Parse(parts[1]);
+                            else if (parts.Length == 3 && !string.IsNullOrEmpty(parts[2]))
+                                face[i].n = int.Parse(parts[2]);
+                        }
+
+                        objFaces.Add(face);
+                        break;
                 }
             }
         }

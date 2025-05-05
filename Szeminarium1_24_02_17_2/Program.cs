@@ -4,6 +4,7 @@ using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
+using System.IO;
 
 namespace Szeminarium1_24_02_17_2
 {
@@ -376,22 +377,39 @@ namespace Szeminarium1_24_02_17_2
         private static unsafe void SetUpObjects()
         {
 
-            float[] face1Color = [1f, 0f, 0f, 1.0f];
-            float[] face2Color = [0.0f, 1.0f, 0.0f, 1.0f];
-            float[] face3Color = [0.0f, 0.0f, 1.0f, 1.0f];
-            float[] face4Color = [1.0f, 0.0f, 1.0f, 1.0f];
-            float[] face5Color = [0.0f, 1.0f, 1.0f, 1.0f];
-            float[] face6Color = [1.0f, 1.0f, 0.0f, 1.0f];
+            // eleresi utvonal
+            string objPath = Path.GetFullPath(Path.Combine(
+                AppContext.BaseDirectory,                   // bin\Debug\net8.0
+                "..", "..", "..",                                       // ← vissza a projekt gyokereig
+                "Resources",
+                "sandal.obj"));
+            // alapszin a szandalnak
+            float[] defaultColor = { 1f, 0.6f, 0.2f, 1f };
 
-            teapot = ObjResourceReader.CreateTeapotWithColor(Gl, face1Color);
+            teapot = ObjResourceReader.LoadObjWithColor(Gl, objPath, defaultColor);
 
-            float[] tableColor = [System.Drawing.Color.Azure.R/256f,
-                                  System.Drawing.Color.Azure.G/256f,
-                                  System.Drawing.Color.Azure.B/256f,
-                                  1f];
+            
+            float[] face1Color = { 1f, 0f, 0f, 1f };
+            float[] face2Color = { 0f, 1f, 0f, 1f };
+            float[] face3Color = { 0f, 0f, 1f, 1f };
+            float[] face4Color = { 1f, 0f, 1f, 1f };
+            float[] face5Color = { 0f, 1f, 1f, 1f };
+            float[] face6Color = { 1f, 1f, 0f, 1f };
+
+            float[] tableColor =
+            {
+                System.Drawing.Color.Azure.R / 256f,
+                System.Drawing.Color.Azure.G / 256f,
+                System.Drawing.Color.Azure.B / 256f,
+                1f
+            };
+
             table = GlCube.CreateSquare(Gl, tableColor);
 
-            glCubeRotating = GlCube.CreateCubeWithFaceColors(Gl, face1Color, face2Color, face3Color, face4Color, face5Color, face6Color);
+            glCubeRotating = GlCube.CreateCubeWithFaceColors(
+                Gl,
+                face1Color, face2Color, face3Color,
+                face4Color, face5Color, face6Color);
         }
 
         
