@@ -179,6 +179,7 @@ namespace Szeminarium1_24_02_17_2
             {
                 Console.WriteLine($"Error linking shader {Gl.GetProgramInfoLog(program)}");
             }
+
             Gl.DetachShader(program, vshader);
             Gl.DetachShader(program, fshader);
             Gl.DeleteShader(vshader);
@@ -293,7 +294,8 @@ namespace Szeminarium1_24_02_17_2
                 throw new Exception($"{ViewPosVariableName} uniform not found on shader.");
             }
 
-            Gl.Uniform3(location, cameraDescriptor.Position.X, cameraDescriptor.Position.Y, cameraDescriptor.Position.Z);
+            Gl.Uniform3(location, cameraDescriptor.Position.X, cameraDescriptor.Position.Y,
+                cameraDescriptor.Position.Z);
             CheckError();
         }
 
@@ -317,9 +319,11 @@ namespace Szeminarium1_24_02_17_2
             Matrix4X4<float> diamondScale = Matrix4X4.CreateScale(1f);
             Matrix4X4<float> rotx = Matrix4X4.CreateRotationX((float)Math.PI / 4f);
             Matrix4X4<float> rotz = Matrix4X4.CreateRotationZ((float)Math.PI / 4f);
-            Matrix4X4<float> rotLocY = Matrix4X4.CreateRotationY((float)cubeArrangementModel.DiamondCubeAngleOwnRevolution);
+            Matrix4X4<float> rotLocY =
+                Matrix4X4.CreateRotationY((float)cubeArrangementModel.DiamondCubeAngleOwnRevolution);
             Matrix4X4<float> trans = Matrix4X4.CreateTranslation(4f, 4f, 0f);
-            Matrix4X4<float> rotGlobY = Matrix4X4.CreateRotationY((float)cubeArrangementModel.DiamondCubeAngleRevolutionOnGlobalY);
+            Matrix4X4<float> rotGlobY =
+                Matrix4X4.CreateRotationY((float)cubeArrangementModel.DiamondCubeAngleRevolutionOnGlobalY);
             Matrix4X4<float> modelMatrix = diamondScale * rotx * rotz * rotLocY * trans * rotGlobY;
 
             SetModelMatrix(modelMatrix);
@@ -356,7 +360,8 @@ namespace Szeminarium1_24_02_17_2
             Gl.UniformMatrix4(location, 1, false, (float*)&modelMatrix);
             CheckError();
 
-            var modelMatrixWithoutTranslation = new Matrix4X4<float>(modelMatrix.Row1, modelMatrix.Row2, modelMatrix.Row3, modelMatrix.Row4);
+            var modelMatrixWithoutTranslation =
+                new Matrix4X4<float>(modelMatrix.Row1, modelMatrix.Row2, modelMatrix.Row3, modelMatrix.Row4);
             modelMatrixWithoutTranslation.M41 = 0;
             modelMatrixWithoutTranslation.M42 = 0;
             modelMatrixWithoutTranslation.M43 = 0;
@@ -370,25 +375,22 @@ namespace Szeminarium1_24_02_17_2
             {
                 throw new Exception($"{NormalMatrixVariableName} uniform not found on shader.");
             }
+
             Gl.UniformMatrix3(location, 1, false, (float*)&normalMatrix);
             CheckError();
         }
 
         private static unsafe void SetUpObjects()
         {
+            //  COLLLADA dae betoltes
+            string daePath = Path.Combine(
+                AppContext.BaseDirectory, "..", "..", "..", "Resources", "cube.dae");
 
-            // eleresi utvonal
-            string objPath = Path.GetFullPath(Path.Combine(
-                AppContext.BaseDirectory,                   // bin\Debug\net8.0
-                "..", "..", "..",                                       // ← vissza a projekt gyokereig
-                "Resources",
-                "globe.obj"));
-            // alapszin a szandalnak
-            float[] defaultColor = { 1f, 0.6f, 0.2f, 1f };
+            float[] daeColor = { 0.8f, 0.8f, 0.2f, 1f };
 
-            teapot = ObjResourceReader.LoadObjWithColor(Gl, objPath, defaultColor);
+            teapot = ColladaResourceReader.LoadColladaWithColor(Gl, daePath, daeColor);
 
-            
+
             float[] face1Color = { 1f, 0f, 0f, 1f };
             float[] face2Color = { 0f, 1f, 0f, 1f };
             float[] face3Color = { 0f, 0f, 1f, 1f };
@@ -412,7 +414,6 @@ namespace Szeminarium1_24_02_17_2
                 face4Color, face5Color, face6Color);
         }
 
-        
 
         private static void Window_Closing()
         {
@@ -422,7 +423,8 @@ namespace Szeminarium1_24_02_17_2
 
         private static unsafe void SetProjectionMatrix()
         {
-            var projectionMatrix = Matrix4X4.CreatePerspectiveFieldOfView<float>((float)Math.PI / 4f, 1024f / 768f, 0.1f, 100);
+            var projectionMatrix =
+                Matrix4X4.CreatePerspectiveFieldOfView<float>((float)Math.PI / 4f, 1024f / 768f, 0.1f, 100);
             int location = Gl.GetUniformLocation(program, ProjectionMatrixVariableName);
 
             if (location == -1)
@@ -436,7 +438,8 @@ namespace Szeminarium1_24_02_17_2
 
         private static unsafe void SetViewMatrix()
         {
-            var viewMatrix = Matrix4X4.CreateLookAt(cameraDescriptor.Position, cameraDescriptor.Target, cameraDescriptor.UpVector);
+            var viewMatrix = Matrix4X4.CreateLookAt(cameraDescriptor.Position, cameraDescriptor.Target,
+                cameraDescriptor.UpVector);
             int location = Gl.GetUniformLocation(program, ViewMatrixVariableName);
 
             if (location == -1)
